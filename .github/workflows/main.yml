@@ -1,0 +1,50 @@
+
+name: Build Cletuson Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Extract Android project ZIP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No project ZIP found in repository root."
+            exit 1
+          fi
+          mkdir android-project
+          unzip -q "$ZIP_FILE" -d android-project
+          echo "Project extracted."
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build APK
+        run: |
+          PROJECT_DIR=$(find android-project -name settings.gradle -o -name settings.gradle.kts | head -n 1 | xargs dirname)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Could not find settings.gradle in the ZIP."
+            exit 1
+          fi
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Save APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cletuson-Electronic-Analysis-APK
+          path: android-project/**/*.apk
+          
