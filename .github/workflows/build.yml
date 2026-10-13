@@ -1,0 +1,59 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download project files
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Extract Android project
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)"
+          test -n "$ZIP_FILE"
+          mkdir -p android-project
+          unzip -o "$ZIP_FILE" -d android-project
+          SETTINGS="$(find android-project -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -n 1)"
+          test -n "$SETTINGS"
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
+
+      - name: Create Gradle wrapper if missing
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.7
+          fi
+          chmod +x gradlew
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Save APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cletuson-Electronic-Analysis-APK
+          path: android-project/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
